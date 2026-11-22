@@ -159,18 +159,35 @@ function Figure({ label, value, unit }) {
 
 const HEADING_MAP = [
   ['the gist', 'The gist', 'gist'],
+  ['gist', 'The gist', 'gist'],
+  ['verdict', 'The gist', 'gist'],
+  ['summary', 'The gist', 'gist'],
   ['why it landed this way', 'Why it landed this way', 'why'],
+  ['why this landed this way', 'Why it landed this way', 'why'],
+  ['why', 'Why it landed this way', 'why'],
+  ['why (rule applied)', 'Why it landed this way', 'why'],
+  ['rule applied', 'Why it landed this way', 'why'],
+  ['the figures', 'Why it landed this way', 'why'],
   ['watch out', 'Watch out', 'alert'],
   ['the loophole', 'Watch out', 'alert'],
   ['loophole', 'Watch out', 'alert'],
-  ['verdict', 'The gist', 'gist'],
-  ['why (rule applied)', 'Why it landed this way', 'why'],
-  ['why', 'Why it landed this way', 'why'],
+  ['loopholes', 'Watch out', 'alert'],
+  ['caution', 'Watch out', 'alert'],
+  ['alert', 'Watch out', 'alert'],
 ]
 
 function PlainWords({ text }) {
   const sections = parsePlainWords(text)
-  if (sections.length === 0) return null
+  if (sections.length === 0) {
+    if (!text || !String(text).trim()) return null
+    return (
+      <div className="mt-4 rounded-card border border-rule bg-paper-deep p-4">
+        <p className="t-body break-words text-[14.5px] leading-relaxed text-ink whitespace-pre-line">
+          {String(text).replace(/\(LLM unavailable:.*?\)/gi, '').trim()}
+        </p>
+      </div>
+    )
+  }
 
   return (
     <ol className="mt-4 overflow-hidden rounded-card border border-rule">
@@ -204,40 +221,48 @@ function PlainWords({ text }) {
 }
 
 function parsePlainWords(text) {
-  const keys = HEADING_MAP.map(([key]) => escapeRegExp(key)).join('|')
-  let source = String(text || '')
+  if (!text || !String(text).trim()) return []
+
+  let cleaned = String(text)
     .replace(/\r\n/g, '\n')
     .replace(/\*\*/g, '')
     .replace(/__/g, '')
     .replace(/^#+\s*/gm, '')
     .replace(/^\d+[.)]\s+/gm, '')
-    .replace(new RegExp(`\\s+(${keys})\\s*:\\s*`, 'gi'), '\n$1\n')
-    .replace(new RegExp(`^(${keys})\\s*:\\s*`, 'gim'), '$1\n')
     .trim()
-  if (!source) return []
 
+  const keys = HEADING_MAP.map(([key]) => escapeRegExp(key)).join('|')
+  cleaned = cleaned
+    .replace(new RegExp(`(?:^|\\n)\\s*(${keys})\\s*:\\s*`, 'gim'), '\n$1\n')
+    .replace(new RegExp(`\\s+(${keys})\\s*:\\s*`, 'gi'), '\n$1\n')
+
+  const lines = cleaned.split('\n').map((l) => l.trim()).filter(Boolean)
   const sections = []
   let current = null
 
   const flush = () => {
     if (!current) return
-    const paragraphs = splitParagraphs(current.buf.join('\n'))
-    if (paragraphs.length > 0) {
-      sections.push({ title: current.title, tone: current.tone, paragraphs })
+    const textContent = current.buf.join('\n').trim()
+    if (textContent) {
+      const paragraphs = splitParagraphs(textContent)
+      if (paragraphs.length > 0) {
+        sections.push({ title: current.title, tone: current.tone, paragraphs })
+      }
     }
     current = null
   }
 
-  for (const raw of source.split('\n')) {
-    const line = raw.trim()
-    if (!line || line.startsWith('(LLM unavailable')) continue
+  for (const line of lines) {
+    if (line.startsWith('(LLM unavailable')) continue
     const mapped = mapHeading(line)
     if (mapped) {
       flush()
       current = { ...mapped, buf: [] }
       continue
     }
-    if (!current) current = { title: 'The gist', tone: 'gist', buf: [] }
+    if (!current) {
+      current = { title: 'The gist', tone: 'gist', buf: [] }
+    }
     current.buf.push(line)
   }
   flush()
@@ -254,27 +279,13 @@ function mapHeading(raw) {
 }
 
 function splitParagraphs(body) {
-  const chunks = String(body)
-    .split(/\n{2,}/)
-    .map((chunk) => chunk.replace(/\s+/g, ' ').trim())
-    .filter(Boolean)
-  if (chunks.length > 1) return chunks
-
-  // Only a punctuation mark followed by whitespace (or the end of the text)
-  // ends a sentence. A plain [^.!?]+ pattern stops at any period, so a value
-  // like "11.5 g" used to split mid-number - and because the match then had
-  // to wait for the next period followed by a space, the words before the
-  // decimal were silently dropped. That is why "In plain words" read
-  // "5 g per 100 g..." instead of "The label shows 11.5 g per 100 g...".
-  const sentences =
-    (chunks[0] || '').match(/[^.!?]+(?:(?:[.!?](?!\s|$))[^.!?]*)*(?:[.!?]+(?=\s|$)|$)/g) ||
-    [body]
-  const cleaned = sentences.map((s) => s.trim()).filter(Boolean)
-  const paragraphs = []
-  for (let i = 0; i < cleaned.length; i += 2) {
-    paragraphs.push(cleaned.slice(i, i + 2).join(' '))
-  }
-  return paragraphs.filter(Boolean)
+  if (!body) return []
+  const rawChunks = String(body)
+    .split(/\n+/)
+    .map((chunk) => chunk.trim())
+    .filter((chunk) => chunk && !chunk.startsWith('(LLM unavailable'))
+  if (rawChunks.length > 0) return rawChunks
+  return [String(body).trim()]
 }
 
 function escapeRegExp(value) {

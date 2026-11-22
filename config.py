@@ -54,10 +54,10 @@ _PROVIDER_BASE_URLS = {
 }
 
 # Default free models (see README / chat notes for the full free lineup).
-#   Groq free   : openai/gpt-oss-120b, openai/gpt-oss-20b, qwen/qwen3.8-27b
+#   Groq free   : qwen/qwen3.8-27b (fast & clean), openai/gpt-oss-20b
 #   OpenRouter  : nvidia/nemotron-3.5-super-vl:free (vision), etc.
 _PROVIDER_DEFAULT_MODELS = {
-    "groq": "openai/gpt-oss-120b",
+    "groq": "qwen/qwen3.8-27b",
     "openrouter": "nvidia/nemotron-3.5-super-vl:free",
 }
 
