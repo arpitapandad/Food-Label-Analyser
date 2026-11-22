@@ -1,0 +1,76 @@
+{
+  "fssai_phase1_rules": {
+    "version": "2026-11-phase1",
+    "description": "Simplified high-priority rules for Phase-1 claim verification system",
+    
+    "high_protein": {
+      "claim_keywords": ["High Protein", "Rich in Protein", "High in Protein"],
+      "condition": "Protein content must be >= 20% of RDA per 100g (solids) or per 100ml (liquids)",
+      "action": "Compare declared protein value against current ICMR-NIN RDA. Flag if below threshold."
+    },
+
+    "source_of_protein": {
+      "claim_keywords": ["Source of Protein", "Contains Protein"],
+      "condition": "Protein content must be >= 10% of RDA per 100g or 100ml",
+      "action": "Flag if protein is below 10% of RDA"
+    },
+
+    "sugar_free": {
+      "claim_keywords": ["Sugar Free", "Sugars Free", "Zero Sugar"],
+      "condition": "Total sugars <= 0.5 g per 100g (solids) or per 100ml (liquids)",
+      "action": "Check total sugars value in nutrition panel. Flag if above 0.5 g"
+    },
+
+    "low_sugar": {
+      "claim_keywords": ["Low Sugar", "Low in Sugar"],
+      "condition": "Total sugars <= 5 g per 100g (solids) or <= 2.5 g per 100ml (liquids)",
+      "action": "Flag if sugars exceed the limit"
+    },
+
+    "no_added_sugar": {
+      "claim_keywords": ["No Added Sugar", "Without Added Sugar", "Zero Added Sugar"],
+      "conditions": [
+        "No sucrose, glucose, fructose, honey, molasses, corn syrup, malt extract added",
+        "No sugar-containing ingredients used (jams, sweetened chocolate, dried fruit paste, date paste, fruit concentrates used for sweetening, etc.)",
+        "If naturally occurring sugars are present → label must declare 'CONTAINS NATURALLY OCCURRING SUGARS'"
+      ],
+      "action": "Scan ingredients list carefully. Flag if any form of added or substitute sugar is found. Also check for missing mandatory disclaimer."
+    },
+
+    "high_fibre": {
+      "claim_keywords": ["High Fibre", "High Fiber", "Rich in Fibre"],
+      "condition": "Dietary fibre >= 6 g per 100g (solids) or >= 3 g per 100ml (liquids)",
+      "action": "Flag if fibre content is below threshold"
+    },
+
+    "source_of_fibre": {
+      "claim_keywords": ["Source of Fibre", "Source of Fiber"],
+      "condition": "Dietary fibre >= 3 g per 100g (solids) or >= 1.5 g per 100ml (liquids)",
+      "action": "Flag if below threshold"
+    },
+
+    "low_fat": {
+      "claim_keywords": ["Low Fat", "Low in Fat"],
+      "condition": "Fat <= 3 g per 100g (solids) or <= 1.5 g per 100ml (liquids)",
+      "action": "Flag if fat exceeds limit"
+    },
+
+    "prohibited_immediate_flag": {
+      "keywords": [
+        "Prevents", "Treats", "Cures", "Heals",
+        "Anti-cancer", "Anti diabetic", "Diabetic Friendly",
+        "Boosts Immunity", "Supports Immunity",
+        "100% Pure", "100% Natural", "100% Organic",
+        "Clinically Proven", "Doctor Recommended"
+      ],
+      "action": "Immediately flag as high-risk or prohibited unless clear FSSAI approval exists"
+    },
+
+    "mandatory_checks": {
+      "nutrition_panel_present": true,
+      "ingredients_list_present": true,
+      "veg_nonveg_symbol": true,
+      "fssai_license_visible": true
+    }
+  }
+}

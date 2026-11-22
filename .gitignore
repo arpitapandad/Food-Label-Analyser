@@ -1,0 +1,22 @@
+# Secrets - never commit your API keys
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# Tooling / caches
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# Local uploads / temp
+uploads/
+*.log
+
+# Frontend build output and installed packages
+node_modules/
+frontend/dist/

@@ -1,0 +1,25 @@
+# =============================================================================
+# URE - Food Label Analyser :: OPTIONAL OCR dependencies
+# Install only if you want to run the image -> text pipeline:
+#   pip install -r requirements-ocr.txt
+#
+# Engine: RapidOCR (rapidocr-onnxruntime)
+# -----------------------------------------------------------------------------
+# PaddleOCR was the original choice, but PaddlePaddle publishes no wheels for
+# Python 3.14 (this project's runtime), so it cannot be installed here.
+# RapidOCR is used instead: it has cp314 wheels, needs no external system
+# binary, bundles the PP-OCR models in the wheel, and produces comparable
+# results (same model family, exported to ONNX).
+#
+# The backend runs fine WITHOUT this file installed - image OCR then reports
+# "unavailable" (HTTP 501) and callers can use the manual-entry endpoint.
+# =============================================================================
+
+rapidocr-onnxruntime>=1.2.3
+
+# --- Alternative engine (optional) -------------------------------------------
+# Tesseract is faster to set up but weaker on stylised Indian packaging.
+# It also needs the Tesseract application installed separately and on PATH.
+# Enable it with OCR_ENGINE=tesseract in .env.
+#   pytesseract>=0.3.13
+#   Pillow>=10.0

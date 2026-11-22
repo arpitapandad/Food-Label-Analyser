@@ -1,0 +1,25 @@
+
+# URE - Food Label Analyser-core dependencies
+# free / open-source. Installs cleanly on Windows + Linux.
+
+
+# Web API layer
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-multipart>=0.0.9        # required for multipart file uploads (image)
+
+# Data / rules
+pandas>=2.2
+
+# --- LLM client (OpenAI-compatible: works for BOTH Groq and OpenRouter) ---
+openai>=1.30
+
+# --- Config ---
+python-dotenv>=1.0
+
+# --- Tests ---
+pytest>=8.0
+
+# NOTE: OCR dependencies are heavy and platform-specific.
+# Install them separately ONLY when you want image -> text:
+#   pip install -r requirements-ocr.txt

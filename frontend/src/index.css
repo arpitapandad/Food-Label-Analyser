@@ -1,0 +1,356 @@
+@import 'tailwindcss';
+
+/* ==========================================================================
+   SELF-HOSTED FONTS
+   Files live in `frontend/public/fonts/`, so they resolve from the site root.
+   To swap a face, drop a replacement in that folder and edit the url() here.
+
+   Cormorant Garamond ships as a VARIABLE font (wght 300-700) plus a matching
+   variable italic. Instrument Serif and Redaction 20 are static cuts.
+   ========================================================================== */
+@font-face {
+  font-family: 'Cormorant Garamond';
+  src: url('/fonts/Cormorant_Garamond/CormorantGaramond-VariableFont_wght.ttf') format('truetype');
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Cormorant Garamond';
+  src: url('/fonts/Cormorant_Garamond/CormorantGaramond-Italic-VariableFont_wght.ttf')
+    format('truetype');
+  font-weight: 300 700;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Instrument Serif';
+  src: url('/fonts/Instrument_Serif/InstrumentSerif-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Instrument Serif';
+  src: url('/fonts/Instrument_Serif/InstrumentSerif-Italic.ttf') format('truetype');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Redaction 20';
+  src: url('/fonts/Redaction_20/Redaction20-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Redaction 20';
+  src: url('/fonts/Redaction_20/Redaction20-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Redaction 20';
+  src: url('/fonts/Redaction_20/Redaction20-Italic.ttf') format('truetype');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* ==========================================================================
+   THEME TOKENS — change colours and type HERE and nowhere else.
+   Every token becomes a Tailwind utility:
+     --color-ink    ->  text-ink / bg-ink / border-ink
+     --font-display ->  font-display
+     --radius-tile  ->  rounded-tile
+   ========================================================================== */
+@theme {
+  /* --- Paper palette ------------------------------------------------------
+     Deliberately flat and warm. No glass, no gradient washes: the page should
+     read like printed stock, not a dashboard. */
+  --color-paper: #faf7f1; /* page stock        */
+  --color-paper-deep: #f2ede3; /* recessed areas    */
+  --color-surface: #ffffff; /* cards and fields  */
+  --color-rule: #e4dccd; /* hairlines         */
+  --color-rule-soft: #f0eae0;
+  --color-ink: #17130f; /* headings          */
+  --color-ink-soft: #5c5449; /* body text         */
+  --color-ink-faint: #9a9184; /* meta text         */
+
+  /* --- One decisive accent, plus the verdict marks ------------------------ */
+  --color-vermilion: #b23a1c;
+  --color-vermilion-deep: #8f2e15;
+  --color-ochre: #a1711a;
+  --color-moss: #2f6b4f;
+  --color-slate: #6d6559;
+
+  /* --- Type ---------------------------------------------------------------
+     Three voices, three jobs:
+       font-display  Cormorant Garamond  - the editorial voice: headlines,
+                                          section numerals, quoted claims.
+       font-figure   Instrument Serif    - the data voice: verdict headline and
+                                          the large measured / required figures.
+       font-body     Redaction 20        - body copy, labels, buttons, inputs. */
+  --font-display: 'Cormorant Garamond', 'Iowan Old Style', Georgia, serif;
+  --font-figure: 'Instrument Serif', 'Cormorant Garamond', Georgia, serif;
+  --font-body: 'Redaction 20', 'Iowan Old Style', Georgia, serif;
+
+  /* --- Corners: tight, print-like ---------------------------------------- */
+  --radius-tile: 6px;
+  --radius-card: 10px;
+}
+
+/* --------------------------------------------------------------------------
+   Base
+   -------------------------------------------------------------------------- */
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* Each family ships only the cuts it ships — Redaction 20 has regular,
+       bold and italic but no medium. Never let the browser fake an in-between
+       weight; it looks smeared at 13px. */
+    font-synthesis: none;
+  }
+
+  /* Headings always use the display cut. */
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+
+  /* No spinner arrows in the nutrition fields. */
+  input[type='number']::-webkit-outer-spin-button,
+  input[type='number']::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type='number'] {
+    -moz-appearance: textfield;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Reusable classes
+   -------------------------------------------------------------------------- */
+@layer components {
+  /* The phone-width page. */
+  .app-shell {
+    width: 100%;
+    max-width: 430px;
+    margin-inline: auto;
+    min-height: 100dvh;
+    position: relative;
+    background: var(--color-paper);
+    overflow-x: hidden;
+  }
+
+  @media (min-width: 560px) {
+    .app-shell {
+      box-shadow: 0 0 0 1px var(--color-rule);
+    }
+  }
+
+  /* Small-caps meta label. Colour is set per use-site. */
+  .t-label {
+    font-family: var(--font-body);
+    font-size: 10.5px;
+    line-height: 1;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  /* Body copy. */
+  .t-body {
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.62;
+    color: var(--color-ink-soft);
+  }
+
+  /* Primary action: solid ink, flipping to the accent on hover. */
+  .btn-primary {
+    background: var(--color-ink);
+    color: #fdfbf6;
+    border: 1px solid var(--color-ink);
+    font-family: var(--font-body);
+    font-size: 11.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    transition:
+      background-color 0.15s ease,
+      border-color 0.15s ease;
+  }
+  .btn-primary:not(:disabled):hover {
+    background: var(--color-vermilion);
+    border-color: var(--color-vermilion);
+  }
+  .btn-primary:disabled {
+    background: transparent;
+    border-color: var(--color-rule);
+    color: var(--color-ink-faint);
+    cursor: not-allowed;
+  }
+
+  /* Secondary action: hairline outline. */
+  .btn-line {
+    background: transparent;
+    border: 1px solid var(--color-rule);
+    color: var(--color-ink);
+    font-family: var(--font-body);
+    font-size: 11.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    transition:
+      border-color 0.15s ease,
+      color 0.15s ease;
+  }
+  .btn-line:not(:disabled):hover {
+    border-color: var(--color-ink);
+  }
+  .btn-line:disabled {
+    color: var(--color-ink-faint);
+    cursor: not-allowed;
+  }
+
+  /* Inputs and textareas. */
+  .field {
+    width: 100%;
+    background: var(--color-surface);
+    border: 1px solid var(--color-rule);
+    border-radius: var(--radius-tile);
+    color: var(--color-ink);
+    font-family: var(--font-body);
+    font-size: 15px;
+    transition:
+      border-color 0.15s ease,
+      box-shadow 0.15s ease;
+  }
+  .field::placeholder {
+    color: var(--color-ink-faint);
+  }
+  .field:focus {
+    outline: none;
+    border-color: var(--color-ink);
+    box-shadow: 0 0 0 3px rgba(23, 19, 15, 0.06);
+  }
+
+  /* A camera slot. Captured state is signalled by the border, not a glow. */
+  .scan-slot {
+    border: 1px solid var(--color-rule);
+    border-radius: var(--radius-card);
+    background: var(--color-surface);
+    transition: border-color 0.15s ease;
+  }
+  .scan-slot:hover {
+    border-color: var(--color-ink-faint);
+  }
+  .scan-slot[data-state='captured'] {
+    border-color: var(--color-moss);
+  }
+
+  /* Verdict stamp: flat, rectangular, uppercase. */
+  .verdict-tag {
+    border-radius: 3px;
+    color: #fff;
+    font-family: var(--font-body);
+    font-size: 10px;
+    line-height: 1;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 7px 10px;
+  }
+  .verdict-tag[data-verdict='true'] {
+    background: var(--color-moss);
+  }
+  .verdict-tag[data-verdict='misleading'] {
+    background: var(--color-ochre);
+  }
+  .verdict-tag[data-verdict='false'] {
+    background: var(--color-vermilion);
+  }
+  .verdict-tag[data-verdict='unknown'],
+  .verdict-tag[data-verdict='incomplete'] {
+    background: var(--color-slate);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Motion — one restrained rise, nothing bouncy.
+   -------------------------------------------------------------------------- */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.animate-rise {
+  animation: rise 0.3s ease-out both;
+}
+
+@keyframes slide-in-left {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: none;
+  }
+}
+.animate-slide-in-left {
+  animation: slide-in-left 0.24s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+.animate-slide-in-right {
+  animation: slide-in-right 0.24s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+@keyframes rise-sheet {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+.animate-rise-sheet {
+  animation: rise-sheet 0.26s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
