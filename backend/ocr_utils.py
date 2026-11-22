@@ -21,6 +21,7 @@ entry.
 """
 from __future__ import annotations
 
+import gc
 import os
 import tempfile
 from typing import Callable, List, Optional
@@ -49,7 +50,17 @@ def _load_rapidocr():
             "RapidOCR is not installed. Run 'pip install -r requirements-ocr.txt' "
             "or use the manual-entry endpoint (/verify/json)."
         ) from exc
-    return RapidOCR()
+    engine = RapidOCR()
+    # Cap detection side length so ONNX Runtime stays within strict memory
+    # limits (e.g. Render free tier 512 MB). By default, RapidOCR uses
+    # limit_type: 'min', which leaves large images unscaled and causes OOM crashes.
+    try:
+        if hasattr(engine, "text_detector") and engine.text_detector:
+            engine.text_detector.preprocess_op[0].limit_type = "max"
+            engine.text_detector.preprocess_op[0].limit_side_len = 960
+    except Exception:
+        pass
+    return engine
 
 
 def _box_centre(box) -> float:
@@ -162,8 +173,9 @@ def _run_tesseract(engine, image_path: str) -> List[str]:
 # Phone photos arrive sideways (EXIF rotation) and at 8-12 MP. OCR is both
 # faster and more accurate when the pixels are upright and the long edge is
 # capped. The browser downscales before uploading, but direct API callers and
-# older browsers rely on this safety net.
-MAX_OCR_IMAGE_EDGE = 2400
+# older browsers rely on this safety net. A 1024px cap keeps peak memory well
+# within 512 MB cloud container limits while preserving full readability.
+MAX_OCR_IMAGE_EDGE = 1024
 
 
 def normalize_image_file(image_path: str) -> Optional[str]:
@@ -255,7 +267,9 @@ def extract_text_from_image(image_path: str) -> List[str]:
     """
     _name, runner, engine = _get_engine()
     try:
-        return runner(engine, image_path)
+        lines = runner(engine, image_path)
+        gc.collect()
+        return lines
     except (OCRUnavailableError, OCRExtractionError):
         raise
     except Exception as exc:  # pragma: no cover - depends on local install

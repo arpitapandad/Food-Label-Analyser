@@ -9,10 +9,10 @@
  * a few hundred kilobytes.
  */
 
-const MAX_EDGE = 2000
+const MAX_EDGE = 1024
 const JPEG_QUALITY = 0.85
 /** Small images that are already compact are left untouched. */
-const KEEP_UNDER_BYTES = 600 * 1024
+const KEEP_UNDER_BYTES = 200 * 1024
 
 /**
  * Return a File suitable for uploading. Never throws: if the browser cannot

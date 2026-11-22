@@ -22,6 +22,7 @@ during development. Lock this down before any public deployment.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import tempfile
 from pathlib import Path
@@ -208,9 +209,11 @@ async def _ocr_upload(upload: UploadFile) -> str:
             tmp.write(data)
             tmp_path = tmp.name
         # Apply EXIF rotation and cap the resolution before the engine runs.
-        # None means "use the original bytes", never a hard failure.
-        normalized_path = normalize_image_file(tmp_path)
-        return extract_combined_text(normalized_path or tmp_path)
+        # Run in worker threads so the async event loop stays responsive.
+        normalized_path = await asyncio.to_thread(normalize_image_file, tmp_path)
+        return await asyncio.to_thread(
+            extract_combined_text, normalized_path or tmp_path
+        )
     except OCRUnavailableError as exc:
         raise HTTPException(status_code=501, detail=str(exc))
     except OCRExtractionError as exc:
