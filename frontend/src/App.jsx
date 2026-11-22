@@ -92,55 +92,48 @@ export default function App() {
   // -------------------------------------------------------------------------
   // Scanning
   // -------------------------------------------------------------------------
-  const runExtract = useCallback(async (nextScans) => {
+  const runExtract = useCallback(async (targetSlot, file) => {
+    if (!file) return
     const seq = ++extractSeq.current
     setExtracting(true)
     setExtractNote(null)
     setError(null)
     try {
-      // Phones hand us 8-12 MP photos. Downscale and apply EXIF rotation before
-      // uploading, or the request can exceed the body limit and OCR stalls.
-      // Sequential, because decoding two large photos at once is heavy on
-      // low-memory phones.
-      const ingredientsFile = await prepareImageForUpload(nextScans.ingredients?.file)
-      const panelFile = await prepareImageForUpload(nextScans.panel?.file)
+      // Downscale to 960px and apply EXIF orientation before upload.
+      const preparedFile = await prepareImageForUpload(file)
 
-      const data = await extractLabel({ ingredientsFile, panelFile })
+      // Only send the image that was just photographed so the backend processes
+      // one image at a time, avoiding duplicate work and halving waiting time.
+      const payload = {}
+      if (targetSlot === 'ingredients') {
+        payload.ingredientsFile = preparedFile
+      } else if (targetSlot === 'panel') {
+        payload.panelFile = preparedFile
+      }
+
+      const data = await extractLabel(payload)
       // A newer scan superseded this request while it was in flight.
       if (seq !== extractSeq.current) return
 
-      // Seed the editable fields with whatever OCR found. Only touch the panel
-      // when a panel photo was actually sent: an ingredient-only pass must not
-      // erase numbers the user has already typed.
-      if (nextScans.panel?.file) {
-        setPanel({ ...blankPanel(), ...stringify(data.parsed_panel || {}) })
-      }
-      setIngredients(data.ingredients || '')
-      setLabelText(data.extracted_text || '')
-
-      const rows = Object.keys(data.parsed_panel || {}).length
-      const gotIngredients = Boolean(String(data.ingredients || '').trim())
-      const hasPanelPhoto = Boolean(nextScans.panel?.file)
-
-      if (rows > 0) {
+      if (targetSlot === 'panel') {
+        const rows = Object.keys(data.parsed_panel || {}).length
+        setPanel((prev) => ({ ...prev, ...stringify(data.parsed_panel || {}) }))
         setExtractNote(
-          `Read ${rows} value${rows === 1 ? '' : 's'} from your label. Please check them below.`,
+          rows > 0
+            ? `Read ${rows} value${rows === 1 ? '' : 's'} from your nutrition table. Please check them below.`
+            : 'We could not read any nutrition numbers. Enter them below to continue.',
         )
-      } else if (!hasPanelPhoto) {
-        // Only the ingredient photo has been taken so far. Never imply the
-        // nutrition table was read when it was not even uploaded.
+      } else if (targetSlot === 'ingredients') {
+        const gotIngredients = Boolean(String(data.ingredients || '').trim())
+        setIngredients(data.ingredients || '')
         setExtractNote(
           gotIngredients
             ? 'Ingredient list read. Now add the nutrition value table.'
             : 'We could not read the ingredient list. Try a clearer photo or type it in below.',
         )
-      } else {
-        setExtractNote(
-          gotIngredients
-            ? 'We read the ingredient list but could not read the nutrition numbers. Enter them below to continue.'
-            : 'We could not read any nutrition numbers. Enter them below to continue.',
-        )
       }
+
+      setLabelText((prev) => (prev ? `${prev}\n${data.extracted_text || ''}` : (data.extracted_text || '')))
     } catch (err) {
       if (seq !== extractSeq.current) return
       if (err.status === 501) {
@@ -171,10 +164,8 @@ export default function App() {
       setScans(next)
       setResults([])
 
-      // Read as soon as the ingredient photo exists, so the ingredient list is
-      // visible (and editable) even before the nutrition table is added. When
-      // the second photo arrives this runs again and fills the numbers too.
-      if (next.ingredients?.file) runExtract(next)
+      // Only run extraction for the photo that was just added/replaced!
+      runExtract(slotId, file)
     },
     [runExtract],
   )

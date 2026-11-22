@@ -51,13 +51,16 @@ def _load_rapidocr():
             "or use the manual-entry endpoint (/verify/json)."
         ) from exc
     engine = RapidOCR()
-    # Cap detection side length so ONNX Runtime stays within strict memory
-    # limits (e.g. Render free tier 512 MB). By default, RapidOCR uses
-    # limit_type: 'min', which leaves large images unscaled and causes OOM crashes.
+    # Speed & memory optimizations:
+    # 1. Disable angle classification: label photos are already rotated upright by EXIF,
+    #    so skipping per-box angle classification eliminates massive CPU overhead.
+    # 2. Cap detection side length to 896px: reduces tensor convolutions while preserving
+    #    clear character resolution on packaging text.
+    engine.use_angle_cls = False
     try:
         if hasattr(engine, "text_detector") and engine.text_detector:
             engine.text_detector.preprocess_op[0].limit_type = "max"
-            engine.text_detector.preprocess_op[0].limit_side_len = 960
+            engine.text_detector.preprocess_op[0].limit_side_len = 896
     except Exception:
         pass
     return engine
@@ -173,9 +176,9 @@ def _run_tesseract(engine, image_path: str) -> List[str]:
 # Phone photos arrive sideways (EXIF rotation) and at 8-12 MP. OCR is both
 # faster and more accurate when the pixels are upright and the long edge is
 # capped. The browser downscales before uploading, but direct API callers and
-# older browsers rely on this safety net. A 1024px cap keeps peak memory well
-# within 512 MB cloud container limits while preserving full readability.
-MAX_OCR_IMAGE_EDGE = 1024
+# older browsers rely on this safety net. A 960px cap matches RapidOCR's native
+# resolution, keeping peak memory and compute minimal.
+MAX_OCR_IMAGE_EDGE = 960
 
 
 def normalize_image_file(image_path: str) -> Optional[str]:
