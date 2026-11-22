@@ -115,6 +115,26 @@ def test_metadata_only_request_needs_no_images():
     assert result.decision.is_technically_compliant is True
 
 
+def test_ingredient_photo_without_heading_still_fills_the_field(monkeypatch):
+    """A cropped photo must not leave the ingredients box empty."""
+    monkeypatch.setattr(main, "extract_combined_text", _echo_ocr)
+
+    data = asyncio.run(
+        main.ocr_extract(
+            ingredients_file=_upload(
+                "Nutrition Information\nEnergy 390 kcal\n"
+                "Multigrain, Apple Juice Concentrate, Antioxidant (INS 306)",
+                "ingredients.jpg",
+            ),
+            panel_file=None,
+            file=None,
+        )
+    )
+
+    assert "Apple Juice Concentrate" in data["ingredients"]
+    assert "Energy" not in data["ingredients"]
+
+
 def test_ocr_unavailable_becomes_501(monkeypatch):
     def _unavailable(path):
         raise ocr_utils.OCRUnavailableError("RapidOCR is not installed.")

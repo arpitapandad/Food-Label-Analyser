@@ -85,7 +85,9 @@ export default function VerifyCard({
 
   // The confirmation fields are gated on this rather than on hasRead alone, so
   // they can still be revealed by hand when a photo yields nothing readable.
-  const showFields = hasRead || extracting || manualEntry
+  // A finished extraction always unlocks them too: the note may tell the user
+  // to type the list in, so the textarea must actually be on screen.
+  const showFields = hasRead || extracting || manualEntry || Boolean(extractNote)
 
   return (
     <section className="mx-5 border border-rule bg-surface px-5 py-6">
@@ -323,53 +325,38 @@ export default function VerifyCard({
 /* ------------------------------------------------------------------ */
 
 function ScanSlot({ index, slot, scan, busy, onScan, onClear }) {
-  const inputRef = useRef(null)
+  const cameraRef = useRef(null)
+  const uploadRef = useRef(null)
   const captured = Boolean(scan)
 
   return (
-    <div
-      className="scan-slot flex items-center gap-3.5 p-3"
-      data-state={captured ? 'captured' : 'pending'}
-    >
-      {captured ? (
-        <img
-          src={scan.url}
-          alt={`${slot.title} preview`}
-          className="size-13 shrink-0 rounded-[4px] object-cover"
-        />
-      ) : (
-        <span className="grid size-13 shrink-0 place-items-center rounded-[4px] bg-paper-deep font-display text-[15px] italic text-ink-faint">
-          {index}
-        </span>
-      )}
+    <div className="scan-slot p-3" data-state={captured ? 'captured' : 'pending'}>
+      <div className="flex items-center gap-3.5">
+        {captured ? (
+          <img
+            src={scan.url}
+            alt={`${slot.title} preview`}
+            className="size-13 shrink-0 rounded-[4px] object-cover"
+          />
+        ) : (
+          <span className="grid size-13 shrink-0 place-items-center rounded-[4px] bg-paper-deep font-display text-[15px] italic text-ink-faint">
+            {index}
+          </span>
+        )}
 
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-[15px] text-ink">{slot.title}</p>
-        <p className="t-label mt-1 truncate text-ink-faint">
-          {captured ? 'Captured' : slot.hint}
-        </p>
-      </div>
-
-      <div className="flex shrink-0 items-center gap-1">
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          disabled={busy}
-          className={`t-label h-11 rounded-[3px] border px-3 transition-colors disabled:opacity-40 ${
-            captured
-              ? 'border-rule text-ink-soft hover:border-ink'
-              : 'border-ink bg-ink text-paper'
-          }`}
-        >
-          {captured ? 'Retake' : 'Scan'}
-        </button>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[15px] text-ink">{slot.title}</p>
+          <p className="t-label mt-1 truncate text-ink-faint">
+            {captured ? 'Captured — check it is readable' : slot.hint}
+          </p>
+        </div>
 
         {captured && (
           <button
             type="button"
             onClick={onClear}
             aria-label={`Remove ${slot.title}`}
-            className="grid size-11 place-items-center rounded-[3px] text-ink-faint transition-colors hover:text-vermilion"
+            className="grid size-11 shrink-0 place-items-center rounded-[3px] text-ink-faint transition-colors hover:text-vermilion"
           >
             <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.5">
               <path d="M18 6 6 18M6 6l12 12" strokeLinecap="round" />
@@ -378,8 +365,35 @@ function ScanSlot({ index, slot, scan, busy, onScan, onClear }) {
         )}
       </div>
 
+      {/* Phones must be able to choose: the camera input forces the camera,
+          while the plain file input opens the gallery / file browser. */}
+      <div className="mt-3 flex gap-2">
+        <button
+          type="button"
+          onClick={() => cameraRef.current?.click()}
+          disabled={busy}
+          className={`t-label flex h-11 flex-1 items-center justify-center gap-2 rounded-[3px] border transition-colors disabled:opacity-40 ${
+            captured
+              ? 'border-rule text-ink-soft hover:border-ink'
+              : 'border-ink bg-ink text-paper'
+          }`}
+        >
+          <CameraIcon />
+          {captured ? 'Retake' : 'Take photo'}
+        </button>
+        <button
+          type="button"
+          onClick={() => uploadRef.current?.click()}
+          disabled={busy}
+          className="t-label flex h-11 flex-1 items-center justify-center gap-2 rounded-[3px] border border-rule text-ink-soft transition-colors hover:border-ink disabled:opacity-40"
+        >
+          <UploadIcon />
+          Upload
+        </button>
+      </div>
+
       <input
-        ref={inputRef}
+        ref={cameraRef}
         type="file"
         accept="image/*"
         capture="environment"
@@ -391,7 +405,54 @@ function ScanSlot({ index, slot, scan, busy, onScan, onClear }) {
           e.target.value = ''
         }}
       />
+      <input
+        ref={uploadRef}
+        type="file"
+        accept="image/*"
+        className="sr-only"
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (file) onScan(file)
+          // Reset so re-picking the same file still fires onChange.
+          e.target.value = ''
+        }}
+      />
     </div>
+  )
+}
+
+function CameraIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="size-4 shrink-0"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      aria-hidden="true"
+    >
+      <path
+        d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"
+        strokeLinejoin="round"
+      />
+      <circle cx="12" cy="13" r="3.2" />
+    </svg>
+  )
+}
+
+function UploadIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="size-4 shrink-0"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      aria-hidden="true"
+    >
+      <path d="M12 16V4m0 0 4 4m-4-4L8 8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" strokeLinecap="round" />
+    </svg>
   )
 }
 

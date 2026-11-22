@@ -38,6 +38,7 @@ from backend.ocr_utils import (
     OCRUnavailableError,
     build_engine,
     extract_combined_text,
+    normalize_image_file,
 )
 from backend.rules_loader import get_claims, get_meta
 from backend.schemas import VerifyJsonRequest, VerifyResponse
@@ -144,6 +145,11 @@ async def ocr_extract(
         ingredients_ocr = await _ocr_upload(ingredients_file)
         raw_text_parts.append(ingredients_ocr)
         ingredients_text = panel_parser.extract_ingredients(ingredients_ocr)
+        if not ingredients_text:
+            # The heading was cropped or misread. The rest of the photo is
+            # still the ingredient list, so surface it for the user to edit
+            # instead of leaving the field empty.
+            ingredients_text = panel_parser.ingredient_text_fallback(ingredients_ocr)
 
     if file is not None:
         raw_text_parts.append(await _ocr_upload(file))
@@ -196,11 +202,15 @@ async def _ocr_upload(upload: UploadFile) -> str:
         )
 
     tmp_path = None
+    normalized_path = None
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
             tmp.write(data)
             tmp_path = tmp.name
-        return extract_combined_text(tmp_path)
+        # Apply EXIF rotation and cap the resolution before the engine runs.
+        # None means "use the original bytes", never a hard failure.
+        normalized_path = normalize_image_file(tmp_path)
+        return extract_combined_text(normalized_path or tmp_path)
     except OCRUnavailableError as exc:
         raise HTTPException(status_code=501, detail=str(exc))
     except OCRExtractionError as exc:
@@ -209,6 +219,8 @@ async def _ocr_upload(upload: UploadFile) -> str:
             detail=f"Could not read '{upload.filename or 'image'}': {exc}",
         )
     finally:
+        if normalized_path:
+            Path(normalized_path).unlink(missing_ok=True)
         if tmp_path:
             Path(tmp_path).unlink(missing_ok=True)
 
@@ -268,6 +280,8 @@ async def verify_image(
         # the ingredient photo is a much more reliable source than a mixed blob.
         if not ingredients_text:
             ingredients_text = panel_parser.extract_ingredients(ingredients_ocr)
+            if not ingredients_text:
+                ingredients_text = panel_parser.ingredient_text_fallback(ingredients_ocr)
 
     if file is not None:
         raw_text_parts.append(await _ocr_upload(file))

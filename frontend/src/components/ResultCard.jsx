@@ -189,8 +189,11 @@ function PlainWords({ text }) {
               {String(index + 1).padStart(2, '0')}
             </span>
           </div>
-          {section.paragraphs.map((paragraph) => (
-            <p key={paragraph} className="t-body mt-3 text-[14.5px] leading-[1.72]">
+          {section.paragraphs.map((paragraph, paragraphIndex) => (
+            <p
+              key={`${index}-${paragraphIndex}`}
+              className="t-body mt-3 break-words text-[14.5px] leading-[1.72]"
+            >
               {paragraph}
             </p>
           ))}
@@ -257,7 +260,15 @@ function splitParagraphs(body) {
     .filter(Boolean)
   if (chunks.length > 1) return chunks
 
-  const sentences = (chunks[0] || '').match(/[^.!?]+[.!?]+(?:\s+|$)|[^.!?]+$/g) || [body]
+  // Only a punctuation mark followed by whitespace (or the end of the text)
+  // ends a sentence. A plain [^.!?]+ pattern stops at any period, so a value
+  // like "11.5 g" used to split mid-number - and because the match then had
+  // to wait for the next period followed by a space, the words before the
+  // decimal were silently dropped. That is why "In plain words" read
+  // "5 g per 100 g..." instead of "The label shows 11.5 g per 100 g...".
+  const sentences =
+    (chunks[0] || '').match(/[^.!?]+(?:(?:[.!?](?!\s|$))[^.!?]*)*(?:[.!?]+(?=\s|$)|$)/g) ||
+    [body]
   const cleaned = sentences.map((s) => s.trim()).filter(Boolean)
   const paragraphs = []
   for (let i = 0; i < cleaned.length; i += 2) {

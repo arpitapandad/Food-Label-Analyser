@@ -2,6 +2,7 @@
 from backend.panel_parser import (
     detect_serving_basis,
     extract_ingredients,
+    ingredient_text_fallback,
     parse_nutrition_panel,
 )
 
@@ -40,6 +41,35 @@ def test_extracts_ingredients():
     ingredients = extract_ingredients(SAMPLE)
     assert "Apple Juice Concentrate" in ingredients
     assert "Nutrition" not in ingredients
+
+
+# --- ingredient photo with the heading cropped off -------------------------
+# A phone photo of the ingredient panel often misses the word "Ingredients".
+# The list itself is still fully readable, so leaving the UI field empty made
+# the scan look broken.
+
+def test_ingredient_fallback_keeps_the_list_when_heading_is_missing():
+    ocr = (
+        "Nutrition Information (per 100 g)\n"
+        "Energy 390 kcal\n"
+        "Protein 11.5 g\n"
+        "Multigrain (85.2%), Apple Juice Concentrate, Antioxidant (INS 306)"
+    )
+    assert (
+        ingredient_text_fallback(ocr)
+        == "Multigrain (85.2%), Apple Juice Concentrate, Antioxidant (INS 306)"
+    )
+
+
+def test_ingredient_fallback_is_empty_when_photo_is_only_the_panel():
+    ocr = "Nutrition Information\nEnergy 390 kcal\nProtein 11.5 g\n35"
+    assert ingredient_text_fallback(ocr) == ""
+
+
+def test_ingredient_fallback_does_not_drop_ingredients_that_look_like_labels():
+    # "Sodium Caseinate" is an ingredient, not the Sodium nutrition row.
+    ocr = "Sodium Caseinate (milk), Salt, Permitted Flavours"
+    assert ingredient_text_fallback(ocr) == ocr
 
 
 # --- OCR digit/letter confusion -------------------------------------------

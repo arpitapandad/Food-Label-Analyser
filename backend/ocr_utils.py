@@ -21,6 +21,8 @@ entry.
 """
 from __future__ import annotations
 
+import os
+import tempfile
 from typing import Callable, List, Optional
 
 import config
@@ -155,6 +157,56 @@ def _run_tesseract(engine, image_path: str) -> List[str]:
 
     text = engine.image_to_string(Image.open(image_path))
     return [line.strip() for line in (text or "").splitlines() if line.strip()]
+
+
+# Phone photos arrive sideways (EXIF rotation) and at 8-12 MP. OCR is both
+# faster and more accurate when the pixels are upright and the long edge is
+# capped. The browser downscales before uploading, but direct API callers and
+# older browsers rely on this safety net.
+MAX_OCR_IMAGE_EDGE = 2400
+
+
+def normalize_image_file(image_path: str) -> Optional[str]:
+    """
+    Return a path to an upright, size-capped JPEG, or None if the file cannot
+    be normalised (unsupported format, Pillow missing, corrupt bytes, ...).
+
+    Callers must delete the returned temp file. On None they should fall back
+    to the original path, so a normalisation failure never loses the photo.
+    """
+    try:
+        from PIL import Image, ImageOps  # provided by Pillow
+    except ImportError:
+        return None
+
+    out_path = None
+    try:
+        with Image.open(image_path) as image:
+            image = ImageOps.exif_transpose(image)
+            if image.mode in ("RGBA", "LA") or (
+                image.mode == "P" and "transparency" in image.info
+            ):
+                # Flatten transparency onto the white label stock instead of
+                # letting JPEG save the transparent pixels as black.
+                rgba = image.convert("RGBA")
+                background = Image.new("RGB", rgba.size, (255, 255, 255))
+                background.paste(rgba, mask=rgba.split()[-1])
+                image = background
+            elif image.mode not in ("RGB", "L"):
+                image = image.convert("RGB")
+            if max(image.size) > MAX_OCR_IMAGE_EDGE:
+                image.thumbnail((MAX_OCR_IMAGE_EDGE, MAX_OCR_IMAGE_EDGE), Image.LANCZOS)
+            handle, out_path = tempfile.mkstemp(suffix=".jpg")
+            os.close(handle)
+            image.save(out_path, format="JPEG", quality=88)
+        return out_path
+    except Exception:
+        if out_path:
+            try:
+                os.unlink(out_path)
+            except OSError:
+                pass
+        return None
 
 
 # Registry: engine name -> (loader, runner). Adding an engine is one entry.

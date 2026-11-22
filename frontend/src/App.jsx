@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { extractLabel, getCategories, getClaims, getHealth, verifyClaim } from './api'
 import { HISTORY_KEY, HISTORY_LIMIT, PANEL_FIELDS } from './constants'
+import { prepareImageForUpload } from './image'
 import Hero from './components/Hero'
 import TopNav from './components/TopNav'
 import VerifyCard, { splitClaims } from './components/VerifyCard'
@@ -48,6 +49,10 @@ export default function App() {
   const [history, setHistory] = useState([])
 
   const resultRef = useRef(null)
+  // Guards against a slow first OCR overwriting a newer result: adding photo 1
+  // and then photo 2 can start two extractions, and the older one may finish
+  // last. Only the latest request is allowed to write to the fields.
+  const extractSeq = useRef(0)
 
   // -------------------------------------------------------------------------
   // Capabilities + saved history, once on mount.
@@ -88,27 +93,56 @@ export default function App() {
   // Scanning
   // -------------------------------------------------------------------------
   const runExtract = useCallback(async (nextScans) => {
+    const seq = ++extractSeq.current
     setExtracting(true)
     setExtractNote(null)
     setError(null)
     try {
-      const data = await extractLabel({
-        ingredientsFile: nextScans.ingredients?.file,
-        panelFile: nextScans.panel?.file,
-      })
+      // Phones hand us 8-12 MP photos. Downscale and apply EXIF rotation before
+      // uploading, or the request can exceed the body limit and OCR stalls.
+      // Sequential, because decoding two large photos at once is heavy on
+      // low-memory phones.
+      const ingredientsFile = await prepareImageForUpload(nextScans.ingredients?.file)
+      const panelFile = await prepareImageForUpload(nextScans.panel?.file)
 
-      // Seed the editable fields with whatever OCR found.
-      setPanel({ ...blankPanel(), ...stringify(data.parsed_panel || {}) })
+      const data = await extractLabel({ ingredientsFile, panelFile })
+      // A newer scan superseded this request while it was in flight.
+      if (seq !== extractSeq.current) return
+
+      // Seed the editable fields with whatever OCR found. Only touch the panel
+      // when a panel photo was actually sent: an ingredient-only pass must not
+      // erase numbers the user has already typed.
+      if (nextScans.panel?.file) {
+        setPanel({ ...blankPanel(), ...stringify(data.parsed_panel || {}) })
+      }
       setIngredients(data.ingredients || '')
       setLabelText(data.extracted_text || '')
 
       const rows = Object.keys(data.parsed_panel || {}).length
-      setExtractNote(
-        rows > 0
-          ? `Read ${rows} value${rows === 1 ? '' : 's'} from your label. Please check them below.`
-          : 'We could not read any nutrition numbers. Enter them below to continue.',
-      )
+      const gotIngredients = Boolean(String(data.ingredients || '').trim())
+      const hasPanelPhoto = Boolean(nextScans.panel?.file)
+
+      if (rows > 0) {
+        setExtractNote(
+          `Read ${rows} value${rows === 1 ? '' : 's'} from your label. Please check them below.`,
+        )
+      } else if (!hasPanelPhoto) {
+        // Only the ingredient photo has been taken so far. Never imply the
+        // nutrition table was read when it was not even uploaded.
+        setExtractNote(
+          gotIngredients
+            ? 'Ingredient list read. Now add the nutrition value table.'
+            : 'We could not read the ingredient list. Try a clearer photo or type it in below.',
+        )
+      } else {
+        setExtractNote(
+          gotIngredients
+            ? 'We read the ingredient list but could not read the nutrition numbers. Enter them below to continue.'
+            : 'We could not read any nutrition numbers. Enter them below to continue.',
+        )
+      }
     } catch (err) {
+      if (seq !== extractSeq.current) return
       if (err.status === 501) {
         setExtractNote(
           'Automatic reading is unavailable on this server. Enter the values below by hand.',
@@ -117,35 +151,45 @@ export default function App() {
         setExtractNote(`Could not read the label: ${err.message}`)
       }
     } finally {
-      setExtracting(false)
+      if (seq === extractSeq.current) setExtracting(false)
     }
   }, [])
 
   const handleScan = useCallback(
     (slotId, file) => {
       if (!file) return
+      // Read from the ref, not the render closure: two picks in quick
+      // succession must not overwrite each other with stale state.
+      const previous = scansRef.current
       // Replacing a photo should release the one it is replacing.
-      if (scans[slotId]?.url) URL.revokeObjectURL(scans[slotId].url)
+      if (previous[slotId]?.url) URL.revokeObjectURL(previous[slotId].url)
       const next = {
-        ...scans,
+        ...previous,
         [slotId]: { file, url: URL.createObjectURL(file) },
       }
+      scansRef.current = next
       setScans(next)
       setResults([])
 
-      // Once both photos are in, read the label immediately so the user can
-      // confirm the numbers BEFORE any verdict is produced.
-      if (next.ingredients?.file && next.panel?.file) runExtract(next)
+      // Read as soon as the ingredient photo exists, so the ingredient list is
+      // visible (and editable) even before the nutrition table is added. When
+      // the second photo arrives this runs again and fills the numbers too.
+      if (next.ingredients?.file) runExtract(next)
     },
-    [scans, runExtract],
+    [runExtract],
   )
 
   const clearScan = useCallback(
     (slotId) => {
-      setScans((prev) => {
-        if (prev[slotId]?.url) URL.revokeObjectURL(prev[slotId].url)
-        return { ...prev, [slotId]: null }
-      })
+      // A result for the photo we are removing must not arrive later and fill
+      // the fields back in.
+      extractSeq.current += 1
+      setExtracting(false)
+      const previous = scansRef.current
+      if (previous[slotId]?.url) URL.revokeObjectURL(previous[slotId].url)
+      const next = { ...previous, [slotId]: null }
+      scansRef.current = next
+      setScans(next)
       setResults([])
       setExtractNote(null)
     },
@@ -248,8 +292,12 @@ export default function App() {
   }
 
   const handleReset = useCallback(() => {
+    extractSeq.current += 1
+    setExtracting(false)
     Object.values(scans).forEach((scan) => scan?.url && URL.revokeObjectURL(scan.url))
-    setScans({ ingredients: null, panel: null })
+    const cleared = { ingredients: null, panel: null }
+    scansRef.current = cleared
+    setScans(cleared)
     setClaim('')
     setCategory('')
     setPanel(blankPanel())

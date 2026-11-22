@@ -221,3 +221,38 @@ def extract_ingredients(raw_text: str) -> str:
     if stop:
         tail = tail[: stop.start()]
     return tail.strip(" .;-")
+
+
+# Lines that belong to the nutrition table rather than the ingredient list.
+# Used only by the fallback below, where there was no "Ingredients" heading to
+# anchor the extraction.
+_NUTRITION_ROW = re.compile(
+    r"^(?:nutrition(?:al)?(?:\s+information)?|"
+    r"per\s*(?:100|serving|serve|pack|piece|bottle|cup|sachet))\b"
+    # A nutrient label counts as a table row only when a value follows (or the
+    # line is just the label). This keeps real ingredients such as
+    # "Sodium Caseinate" or "Salt, ..." from being dropped.
+    r"|^(?:of\s+which\s+)?(?:energy|protein|carbohydrates?|(?:total\s+)?sugars?|"
+    r"added\s+sugars?|dietary\s+fib(?:re|er)|(?:total\s+)?fat|saturat\w*|"
+    r"trans\s+fat|sodium|salt)(?:\s*\(?\s*(?:g|mg|kcal|kj)\s*\)?)?\s*(?:[\d]|$)",
+    flags=re.IGNORECASE,
+)
+
+
+def ingredient_text_fallback(raw_text: str) -> str:
+    """
+    Best-effort ingredient text when OCR missed the word "Ingredients".
+
+    A user who photographs only the ingredient panel often crops the heading
+    off, or the small caps defeat OCR. Returning "" in that case leaves the
+    ingredient box empty even though the rest of the list was read perfectly.
+    This keeps the lines that are clearly not nutrition-table rows so the UI
+    has something real to show and the user can correct it.
+    """
+    kept = []
+    for raw_line in (raw_text or "").splitlines():
+        line = normalize_whitespace(raw_line)
+        if not line or _NUTRITION_ROW.match(line) or _looks_like_bare_value(line):
+            continue
+        kept.append(line)
+    return normalize_whitespace(" ".join(kept)).strip(" .;-")

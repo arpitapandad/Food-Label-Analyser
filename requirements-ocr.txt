@@ -17,6 +17,11 @@
 
 rapidocr-onnxruntime>=1.2.3
 
+# --- Image prep --------------------------------------------------------------
+# Used to apply EXIF rotation and cap phone-photo resolution before OCR.
+# (Also a transitive dependency of RapidOCR, but listed because we import it.)
+Pillow>=10.0
+
 # --- Alternative engine (optional) -------------------------------------------
 # Tesseract is faster to set up but weaker on stylised Indian packaging.
 # It also needs the Tesseract application installed separately and on PATH.
