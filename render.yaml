@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: ure-food-label-analyser
+    runtime: docker
+    plan: free
+    # Render picks up the Dockerfile at the repo root automatically.
+    healthCheckPath: /health
+    envVars:
+      - key: LLM_PROVIDER
+        value: groq
+      - key: GROQ_API_KEY
+        sync: false          # Render will prompt you to fill this in the dashboard
+      - key: OCR_ENGINE
+        value: rapidocr
+      - key: PORT
+        value: "8080"
